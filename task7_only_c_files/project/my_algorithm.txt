@@ -1,0 +1,16 @@
+
+1. скомпилировать файлы библиотеки в объектные модули:
+
+   gcc -c add.c div.c mul.c sub.c 
+
+2. собрать статическую библиотеку утилитой ar (archiver) :
+   
+   ключи r - replace и c - create
+
+   ar rc libcalc.a add.o div.o mul.o sub.o 
+
+3. скомпилировать программу командой:
+	
+	gcc task7_final.c -o task7_final.exe -L../mymath -lcalc
+
+где -L указывает адрес к библоиотеке (.. выйти на каталог выше, перейти в mymath)
